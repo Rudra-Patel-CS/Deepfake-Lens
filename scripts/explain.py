@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 import cv2
 import numpy as np
 import torch
 from PIL import Image
-from retinaface import RetinaFace
 from torchvision import transforms
 
 from ai.explain.gradcam import generate_gradcam_overlays
@@ -21,7 +21,7 @@ DEVICE_NAME = torch.cuda.get_device_name(DEVICE) if DEVICE.type == "cuda" else "
 
 
 def load_model(run_name):
-    checkpoint = torch.load(MODEL_DIR / run_name / "best.pt", map_location=DEVICE)
+    checkpoint = torch.load(MODEL_DIR / run_name / "best.pt", map_location=DEVICE, weights_only=True)
     config = checkpoint.get("config", {})
     branches = config.get("branches", "full")
     flags = {
@@ -42,7 +42,10 @@ def load_model(run_name):
     return model, int(config.get("seq_len", 10))
 
 
-def extract_faces(video_path, limit=30):
+def extract_faces(video_path, limit=30, detector="retinaface"):
+    if detector == "opencv":
+        return extract_opencv_faces(video_path, limit)
+    from retinaface import RetinaFace
     capture = cv2.VideoCapture(str(video_path))
     faces = []
     frame_index = 0
@@ -64,9 +67,36 @@ def extract_faces(video_path, limit=30):
     return faces
 
 
-def run(video, run_name, output_dir=None):
+
+def extract_opencv_faces(video_path, limit):
+    from ai.preprocessing.face_detector import get_face_cropper
+    crop = get_face_cropper("opencv")
+    capture = cv2.VideoCapture(str(video_path))
+    faces = []
+    try:
+        if not capture.isOpened():
+            raise ValueError("Cannot open the supplied video")
+        frame_index = 0
+        while len(faces) < limit:
+            success, frame = capture.read()
+            if not success:
+                break
+            if frame_index % 30 == 0:
+                face = crop(frame)
+                if face is not None:
+                    faces.append(Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB)))
+            frame_index += 1
+    finally:
+        capture.release()
+    return faces
+
+
+def run(video, run_name, output_dir=None, face_detector=None):
+    face_detector = face_detector or os.getenv("FACE_DETECTOR", "opencv")
+    if face_detector not in {"opencv", "retinaface"}:
+        raise ValueError("FACE_DETECTOR must be opencv or retinaface")
     model, sequence_length = load_model(run_name)
-    faces = extract_faces(video, limit=max(sequence_length, 20))
+    faces = extract_faces(video, limit=max(sequence_length, 20), detector=face_detector)
     if not faces:
         raise SystemExit("No faces detected in the supplied video")
     indices = np.linspace(0, len(faces) - 1, sequence_length, dtype=int)
@@ -103,6 +133,7 @@ def run(video, run_name, output_dir=None):
     result = {
         "video": str(video),
         "run_name": run_name,
+        "face_detector": face_detector,
         "device": str(DEVICE),
         "device_name": DEVICE_NAME,
         "fake_score": float(torch.sigmoid(outputs["logit"])[0].cpu()),
@@ -121,6 +152,6 @@ def run(video, run_name, output_dir=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate video explanations.")
     parser.add_argument("--video", required=True)
-    parser.add_argument("--run-name", default="ablation_full")
+    parser.add_argument("--run-name", default="full_v3")
     arguments = parser.parse_args()
     run(arguments.video, arguments.run_name)

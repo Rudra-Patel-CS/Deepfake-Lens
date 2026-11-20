@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: deepfake-video-detector
+    runtime: python
+    plan: free
+    branch: codex/render-free
+    buildCommand: pip install -r requirements-render.txt && python -m scripts.prepare_render
+    startCommand: uvicorn ai.api:app --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /api/health
+    envVars:
+      - key: RENDER_LIGHTWEIGHT
+        value: "1"
+      - key: FACE_DETECTOR
+        value: opencv
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: MKL_NUM_THREADS
+        value: "1"
+      - key: MALLOC_ARENA_MAX
+        value: "2"

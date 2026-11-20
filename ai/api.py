@@ -6,6 +6,8 @@ import shutil
 import uuid
 import json
 import math
+import os
+from threading import Lock
 from pathlib import Path
 
 import torch
@@ -20,6 +22,9 @@ UPLOAD_DIR = ROOT_DIR / "temp" / "uploads"
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/webm"}
 ALLOWED_VIDEO_SUFFIXES = {".mp4", ".mov", ".avi", ".webm"}
 MODEL_RUN = "full_v3"
+LIGHTWEIGHT = os.getenv("RENDER_LIGHTWEIGHT", "0") == "1"
+ANALYSIS_LOCK = Lock()
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 
 
 def json_safe(value):
@@ -32,7 +37,9 @@ def json_safe(value):
     return value
 
 app = FastAPI(title="Deepfake Video Detector")
-app.mount("/assets", StaticFiles(directory=REPORT_DIR), name="assets")
+WEB_REPORT_DIR = REPORT_DIR / "web_analyses"
+WEB_REPORT_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/assets/web_analyses", StaticFiles(directory=WEB_REPORT_DIR), name="assets")
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 
@@ -138,11 +145,15 @@ def health():
         "torch_device": device,
         "torch_device_name": device_name,
         "face_detector_device": "cpu",
+        "face_detector": os.getenv("FACE_DETECTOR", "opencv"),
+        "evaluation_metrics": evaluation_metrics(),
+        "decision_threshold": decision_threshold(),
+        "lightweight": LIGHTWEIGHT,
     }
 
 
 @app.post("/api/analyze")
-async def analyze_video(file: UploadFile = File(...)):
+def analyze_video(file: UploadFile = File(...)):
     if file.content_type and file.content_type not in ALLOWED_VIDEO_TYPES:
         raise HTTPException(status_code=415, detail="Upload an MP4, MOV, AVI, or WebM video.")
     if not file.filename:
@@ -160,10 +171,23 @@ async def analyze_video(file: UploadFile = File(...)):
     output_dir = REPORT_DIR / "web_analyses" / job_id
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+    if not ANALYSIS_LOCK.acquire(blocking=False):
+        file.file.close()
+        raise HTTPException(status_code=409, detail="Another video is being analysed. Try again shortly.")
     try:
         with upload_path.open("wb") as destination:
-            shutil.copyfileobj(file.file, destination)
-        from scripts.explain import run
+            size = 0
+            while chunk := file.file.read(1024 * 1024):
+                size += len(chunk)
+                if size > MAX_UPLOAD_BYTES:
+                    raise HTTPException(status_code=413, detail="Maximum upload size is 20 MB.")
+                destination.write(chunk)
+            if not size:
+                raise HTTPException(status_code=400, detail="The video is empty.")
+        if LIGHTWEIGHT:
+            from scripts.render_predict import run
+        else:
+            from scripts.explain import run
 
         result = run(upload_path, MODEL_RUN, output_dir=output_dir)
         fake_score = result["fake_score"]
@@ -213,6 +237,7 @@ async def analyze_video(file: UploadFile = File(...)):
             "fake_score": fake_score,
             "decision_threshold": threshold,
             "model_run": MODEL_RUN,
+            "face_detector": result.get("face_detector"),
             "device": result.get("device", "cpu"),
             "device_name": result.get("device_name", "CPU"),
             "sequence_length": result.get("sequence_length"),
@@ -225,14 +250,21 @@ async def analyze_video(file: UploadFile = File(...)):
             "limitations": [
                 "This is an assistive screening result, not proof of authenticity.",
                 "Face detection is CPU-bound on native Windows TensorFlow installations.",
-                "Confidence reflects model score relative to the operating threshold and is not a guarantee of correctness.",
+                "Model scores are not calibrated confidence or a guarantee of correctness.",
+                "Supplied evaluation: 78% accuracy on 300 test videos. This has not been independently reproduced locally.",
+                "OpenCV face crops differ from the RetinaFace evaluation pipeline; the supplied accuracy does not measure the OpenCV workflow.",
             ],
         }
+        if LIGHTWEIGHT:
+            report["limitations"].append("Free hosting mode: Grad-CAM and SHAP are disabled; maximum video duration is 60 seconds.")
+        output_dir.mkdir(parents=True, exist_ok=True)
         (output_dir / "forensic_report.json").write_text(
             json.dumps(json_safe(report), indent=2)
         )
         return json_safe({
             "job_id": job_id,
+            "model_run": MODEL_RUN,
+            "face_detector": result.get("face_detector"),
             "filename": file.filename,
             "device": result.get("device", "cpu"),
             "device_name": result.get("device_name", "CPU"),
@@ -244,17 +276,20 @@ async def analyze_video(file: UploadFile = File(...)):
             "detected_frames": overlays,
             "branch_contributions": result["branch_contributions"],
             "suspicion_timeline": result["suspicion_timeline"],
-            "branch_chart_url": f"/assets/web_analyses/{job_id}/shap_branch_contributions.png",
+            "branch_chart_url": None if LIGHTWEIGHT else f"/assets/web_analyses/{job_id}/shap_branch_contributions.png",
             "forensic_report": report,
             "interpretation": interpretation,
             "ai_analysis": interpretation,
             "key_indicators": key_indicators,
             "report_url": f"/assets/web_analyses/{job_id}/forensic_report.json",
         })
-    except SystemExit as error:
+    except HTTPException:
+        raise
+    except (SystemExit, ValueError) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     except Exception as error:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {error}") from error
     finally:
-        await file.close()
+        file.file.close()
         upload_path.unlink(missing_ok=True)
+        ANALYSIS_LOCK.release()

@@ -162,3 +162,70 @@ PyTorch inference and Grad-CAM use `cuda:0` automatically when CUDA is available
 
 ## full preprocessing
 - .\venv\Scripts\python.exe -m scripts.preprocess
+
+## Running the imported full_v3 model on this PC
+
+The files supplied on 20 November 2026 are installed at:
+
+- `trained_models/full_v3/best.pt` (the supplied `best.pt.zip` is already a PyTorch checkpoint; its bytes were copied unchanged)
+- `trained_models/full_v3/config.json`
+- `reports/full_v3/test_metrics.json`
+
+Run `start-web.bat`, then open http://127.0.0.1:8000. This checkout is based on
+`origin/final` and serves the original `frontend/index.html` UI with the supplied
+model. Stop the terminal with Ctrl+C.
+
+The supplied evaluation reports 78% accuracy on 300 videos (234 correct), F1
+0.8024 and ROC-AUC 0.8930. Its operating threshold is 0.006866547744721174;
+it must not be replaced by 0.5. The report has not been independently reproduced
+on this PC, and a video's score is not accuracy or calibrated confidence.
+
+This PC defaults to OpenCV face detection because Windows Application Control
+previously blocked a TensorFlow DLL used by RetinaFace. OpenCV changes face
+crops, so the supplied evaluation does not establish accuracy for this fallback.
+On a working RetinaFace environment, set `FACE_DETECTOR=retinaface` before
+starting the server to use the original final-branch extraction path.
+
+The previous local edits are preserved in a Git stash named
+`Preserve local setup before full_v3 integration` and in
+`temp/pre-full-v3-backup/`. Existing datasets and checkpoints were retained.
+
+## Render free deployment (experimental)
+
+Select GitHub branch `codex/render-free`, Python runtime, and the Free instance.
+Use `.python-version` (Python 3.11); leave Root Directory empty.
+
+Build command:
+
+```sh
+pip install -r requirements-render.txt && python -m scripts.prepare_render
+```
+
+Start command:
+
+```sh
+uvicorn ai.api:app --host 0.0.0.0 --port $PORT --workers 1
+```
+
+Set `RENDER_LIGHTWEIGHT=1`, `FACE_DETECTOR=opencv`, `OMP_NUM_THREADS=1`,
+`MKL_NUM_THREADS=1`, and `MALLOC_ARENA_MAX=2`. Set health check `/api/health`.
+Alternatively use the included `render.yaml` Blueprint, which sets these values.
+
+`deploy/full_v3/best.pt` contains the original learned weights and configuration
+with optimizer/training history removed. The build copies it and the supplied
+metrics into the runtime directories; no model download link or retraining is
+required. Your original local training checkpoint remains unchanged.
+
+Free mode uses CPU-only PyTorch, processes one frame at a time inside each spatial
+branch, limits videos to 20 MB / 60 seconds, and accepts one analysis at a time.
+It keeps the same temporal sequence and supplied decision threshold. Grad-CAM,
+SHAP and attribution charts are disabled to reduce memory; prediction and JSON
+reports remain available. The UI identifies this mode. Reports are temporary and
+are lost when Render restarts or spins down.
+
+Render Free has only 512 MB RAM and 0.1 CPU. This setup is an experimental attempt,
+not a guarantee that video inference fits that limit. CPU inference may be slow,
+and an out-of-memory restart can still require a larger instance or a smaller
+model. Free services sleep after 15 minutes without traffic. Local Windows tests
+do not reproduce Render's Linux memory cap; verify the deployed logs before
+relying on this service.

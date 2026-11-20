@@ -128,6 +128,13 @@ class DeepfakeDetector(nn.Module):
             nn.Linear(256, 1),
         )
 
+    def _encode(self, branch, frames):
+        chunk_size = getattr(self, "inference_frame_batch", 0)
+        if chunk_size and not self.training and not torch.is_grad_enabled():
+            results = [branch(chunk) for chunk in frames.split(chunk_size)]
+            return tuple(torch.cat(items, dim=0) for items in zip(*results))
+        return branch(frames)
+
     def forward(self, rgb_seq: torch.Tensor, fft_seq: torch.Tensor):
         batch_size, seq_len = rgb_seq.shape[:2]
         rgb_flat = rgb_seq.reshape(batch_size * seq_len, *rgb_seq.shape[2:])
@@ -139,13 +146,13 @@ class DeepfakeDetector(nn.Module):
         per_frame_logits = {}
 
         if self.frame_branch is not None:
-            frame_features, frame_logits = self.frame_branch(rgb_flat)
+            frame_features, frame_logits = self._encode(self.frame_branch, rgb_flat)
             frame_features = frame_features.view(batch_size, seq_len, -1)
             per_frame_logits["frame"] = frame_logits.view(batch_size, seq_len)
             branch_logits["frame"] = frame_logits.view(batch_size, seq_len).mean(dim=1)
 
         if self.freq_branch is not None:
-            freq_features, freq_logits = self.freq_branch(fft_flat)
+            freq_features, freq_logits = self._encode(self.freq_branch, fft_flat)
             freq_features = freq_features.view(batch_size, seq_len, -1)
             per_frame_logits["freq"] = freq_logits.view(batch_size, seq_len)
             branch_logits["freq"] = freq_logits.view(batch_size, seq_len).mean(dim=1)

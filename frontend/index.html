@@ -157,7 +157,7 @@
       <aside class="panel intake">
         <div class="panel-head"><h2 class="panel-title">Submit evidence</h2><span class="panel-index">01 / INPUT</span></div>
         <div id="dropzone" class="dropzone">
-          <div class="upload-glyph">↑</div><h2>Drop a video here</h2><p>MP4, MOV, AVI, or WebM. Your file is processed locally by the active analysis service.</p>
+          <div class="upload-glyph">↑</div><h2>Drop a video here</h2><p>MP4, MOV, AVI, or WebM. Maximum 20 MB. Your file is processed by the analysis server.</p>
           <button id="choose" class="choose" type="button">Choose video</button><input id="file" type="file" accept="video/mp4,video/quicktime,video/x-msvideo,video/webm" hidden>
         </div>
         <div id="file-chip" class="file-chip" hidden><span>▣</span><div><strong id="file-name"></strong><small id="file-size"></small></div></div>
@@ -170,7 +170,7 @@
         <div id="empty" class="console-empty"><div class="empty-mark">[ / ]</div><h2>Evidence console ready</h2><p>Choose a video to populate the verdict and its supporting visual evidence.</p></div>
         <div id="loading" class="console-empty" hidden><div class="empty-mark loading">analyzing</div><h2>Tracing the signal</h2><p id="loading-copy">Extracting faces, comparing branches, and building the explanation.</p></div>
         <div id="results" class="console-body" hidden>
-          <div id="verdict" class="verdict"><div><div class="eyebrow">Model verdict</div><div id="label" class="verdict-label"><span class="verdict-dot"></span><span>FAKE</span></div><p id="verdict-copy" class="verdict-copy"></p></div><div class="score-card"><div class="score-row"><span>CONFIDENCE</span><strong id="confidence">--</strong></div><div class="meter"><i id="confidence-meter"></i></div><div class="threshold">Decision threshold <span id="threshold">--</span></div></div></div>
+          <div id="verdict" class="verdict"><div><div class="eyebrow">Model verdict</div><div id="label" class="verdict-label"><span class="verdict-dot"></span><span>FAKE</span></div><p id="verdict-copy" class="verdict-copy"></p></div><div class="score-card"><div class="score-row"><span>FAKE SCORE</span><strong id="confidence">--</strong></div><div class="meter"><i id="confidence-meter"></i></div><div class="threshold">Decision threshold <span id="threshold">--</span></div></div></div>
           <section class="section"><div class="ai-analysis"><div class="ai-analysis-head"><span class="ai-analysis-mark">◉</span><h3>AI analysis</h3></div><p id="ai-analysis-text"></p><div id="indicator-grid" class="indicator-grid"></div></div></section>
           <section class="section"><div class="section-head"><h3>Forensic report</h3><a id="report-download" class="report-link" hidden download="forensic_report.json">Download JSON</a></div><p id="report-summary" class="section-note"></p><p id="report-interpretation" class="interpretation"></p><div id="findings" class="findings"></div><p id="limitations" class="limitations"></p></section>
           <section class="section"><div class="section-head"><h3>Detected frame evidence</h3><span id="frame-count">--</span></div><p id="frame-explanation" class="section-note"></p><div id="frames" class="frames"></div></section>
@@ -192,6 +192,7 @@
         const data = await response.json();
         $("health").textContent = data.ready ? `${data.torch_device_name || data.torch_device || "model"} ready` : "model unavailable";
         $("health").classList.toggle("offline", !data.ready);
+        if (data.lightweight) $("health").textContent += " · free mode: 60s max, explanations disabled";
       } catch (error) {
         $("health").textContent = "backend offline";
         $("health").classList.add("offline");
@@ -200,6 +201,7 @@
 
     function setFile(file) {
       if (!file) return;
+      if (file.size > 20 * 1024 * 1024) { $("error").textContent = "Maximum upload size is 20 MB."; $("error").hidden = false; return; }
       state.file = file;
       $("file-name").textContent = file.name;
       $("file-size").textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB`;
@@ -257,8 +259,8 @@
       $("label").classList.toggle("real", isReal);
       $("label").querySelector("span:last-child").textContent = data.label || "UNKNOWN";
       $("verdict-copy").textContent = `${data.filename || "Video"} · ${data.detected_frames?.length || 0} explanation frames · ${data.device_name || data.device || "CPU"}`;
-      $("confidence").textContent = formatPercent(data.confidence);
-      $("confidence-meter").style.width = `${Math.min(Number(data.confidence || 0) * 100, 100)}%`;
+      $("confidence").textContent = formatPercent(data.fake_score);
+      $("confidence-meter").style.width = `${Math.min(Number(data.fake_score || 0) * 100, 100)}%`;
       $("threshold").textContent = Number(data.decision_threshold || 0).toFixed(4);
       renderReport(data);
       const frames = data.detected_frames || [];
