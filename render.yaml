@@ -1,9 +1,9 @@
 services:
   - type: web
-    name: deepfake-video-detector
+    name: deepfake-lens
     runtime: python
     plan: free
-    branch: codex/render-free
+    branch: main
     buildCommand: pip install -r requirements-render.txt && python -m scripts.prepare_render
     startCommand: uvicorn ai.api:app --host 0.0.0.0 --port $PORT --workers 1
     healthCheckPath: /api/health

@@ -1,6 +1,28 @@
-# Explainable Face-Swap Deepfake Detection
+# Deepfake Lens
 
 Smart India Hackathon project for detecting face-swap deepfake videos with spatial, frequency, and temporal analysis.
+
+
+## Quick start from this repository
+
+The `main` branch includes the web UI, API, trained `full_v3` inference weights,
+configuration, evaluation report, and Render deployment files.
+
+For Render, connect **Rudra-Patel-CS/Deepfake-Lens**, choose branch **main**, and
+use the included `render.yaml` Blueprint. For manual setup, follow the Render
+section below, including its environment variables. Leave Root Directory empty.
+
+For a fresh local checkout, after creating a virtual environment and installing
+`requirements.txt`, install the bundled model assets and start the app:
+
+```powershell
+.\venv\Scripts\python.exe -m scripts.prepare_render
+.\start-web.bat
+```
+
+Open http://127.0.0.1:8000. No training dataset or retraining is required for
+prediction. `prepare_render` copies the bundled inference checkpoint; use it for
+a fresh installation, not to replace an active training checkpoint.
 
 ## Implemented
 
@@ -37,8 +59,8 @@ reports/            Metrics and explanation outputs
 Windows PowerShell, Python 3.13:
 
 ```powershell
-git clone <repository-url>
-cd DeepFakeDetector
+git clone https://github.com/Rudra-Patel-CS/Deepfake-Lens.git
+cd Deepfake-Lens
 py -3.13 -m venv venv
 venv\Scripts\activate
 python -m pip install --upgrade pip
@@ -192,7 +214,7 @@ The previous local edits are preserved in a Git stash named
 
 ## Render free deployment (experimental)
 
-Select GitHub branch `codex/render-free`, Python runtime, and the Free instance.
+Select GitHub branch `main`, Python runtime, and the Free instance.
 Use `.python-version` (Python 3.11); leave Root Directory empty.
 
 Build command:
