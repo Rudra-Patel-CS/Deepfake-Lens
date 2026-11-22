@@ -71,3 +71,42 @@ body::before {
 .video-facts dt { font-weight: 600; }
 #contributions img { width: 100%; }
 .result-panel { min-width: 0; }
+
+.hero {
+  margin: 24px 0 36px;
+  padding: clamp(24px, 4vw, 56px);
+  border-radius: 24px;
+  overflow: hidden;
+  background: #0d1c31;
+  color: #f1f8ff;
+}
+.hero::before {
+  background: radial-gradient(ellipse at 80% 50%, #1d91814d, transparent 55%),
+              radial-gradient(ellipse at 25% 90%, #34528e65, transparent 65%);
+}
+.hero h1 { margin-top: 0; }
+.hero h1 em { color: #7ce7d4; }
+.hero p { color: #c3d3e1; max-width: 50ch; }
+.hero-action { color: #102d34; background: #a1f6df; border-color: transparent; }
+.hero-art { height: auto; aspect-ratio: 12/7; border: 1px solid #60969c66; background-color: #091a27; }
+.hero-art canvas { width: 100%; height: 100%; position: relative; }
+.mesh-sweep { position: absolute; inset: 20% 0 auto; height: 12%; border-bottom: 1px solid #88f6dc88; background: linear-gradient(transparent,#70efcc12); }
+@media (prefers-reduced-motion: no-preference) {
+  .mesh-sweep { animation: scan-face 5s ease-in-out infinite alternate; }
+}
+@keyframes scan-face { to { transform: translateY(410%); } }
+@media (max-width: 760px) {
+  .hero-art { display: grid; max-height: 145px; width: 100%; aspect-ratio: auto; }
+  .hero-art canvas { height: 145px; object-fit: contain; }
+}
+.overall-scores { background: #11263a; color: #eef8ff; padding: clamp(16px, 3vw, 26px); border-radius: 14px; margin: 16px 0; }
+.overall-scores h3 { margin: 0; font-size: 1.05rem; }
+.score-pair { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.score-pair dt { font-size: .78rem; }
+.score-pair dd { margin: 4px 0 0; font: 600 clamp(20px, 3vw, 31px) monospace; letter-spacing: -.055em; }
+.score-pair > div:first-child { color: #89ecd9; }
+.score-pair > div:last-child { color: #ffb095; }
+.balance-track { height: 8px; border-radius: 8px; overflow: hidden; background: #ffb095; }
+.balance-track span { display: block; height: 100%; background: #89ecd9; }
+.overall-scores p { margin-bottom: 6px; }
+.overall-scores small { color: #bdcedd; line-height: 1.5; display: block; }

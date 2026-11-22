@@ -109,8 +109,20 @@ function renderEvidence(data, report) {
     }
   }
 }
+function renderOverallScores(data) {
+  const fakeScore = data.fake_score;
+  const realScore = 1 - fakeScore;
+  $('real-percent').textContent = percent(realScore);
+  $('fake-percent').textContent = percent(fakeScore);
+  $('real-share').style.width = `${realScore * 100}%`;
+  const comparison = data.label === 'FAKE' ? 'met or exceeded' : 'fell below';
+  $('score-rule').textContent =
+    `Prediction: ${data.label}. The fake score ${comparison} the model's ${percent(data.decision_threshold)} cutoff.`;
+}
+
 function renderResult(data){
   if(!['REAL','FAKE'].includes(data.label) || !Number.isFinite(data.fake_score))throw new Error('The server returned an incomplete result. Please try again.');
+  renderOverallScores(data);
   $('prediction-label').textContent = data.label;
   $('prediction').classList.toggle('flagged', data.label === 'FAKE');
   const fake=data.label==='FAKE',report=data.forensic_report||{};

@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Check a face video for signs of manipulation, with clear results and understandable evidence."><title>Deepfake Lens · See beyond the video</title><link rel="stylesheet" href="/static/styles.css"><script defer src="/static/app.js"></script></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Check a face video for signs of manipulation, with clear results and understandable evidence."><title>Deepfake Lens · See beyond the video</title><link rel="stylesheet" href="/static/styles.css"><script defer src="/static/mesh.js"></script><script defer src="/static/app.js"></script></head>
 <body>
 <a class="skip" href="#analyzer">Skip to video analysis</a>
 <header class="topbar"><a class="brand" href="#"><span class="lens-mark" aria-hidden="true"><i></i></span>deepfake<span class="brand-light">lens</span></a><nav aria-label="Main navigation"><a class="nav-active" href="#analyzer">Analyze video</a><a href="#how-it-works">How it works</a><a href="#understanding">Understanding results</a></nav><span class="version">RESEARCH EDITION</span></header>
@@ -9,7 +9,11 @@
 <h1>Check a video for<br><em>face swaps.</em></h1>
 <p>Upload a clip with a visible face. Deepfake Lens checks how the face looks and moves, then gives you a REAL or FAKE prediction.</p>
 <a class="button secondary hero-action" href="#analyzer">Choose a video ↓</a>
-</div><div class="hero-art" aria-hidden="true"><div class="orb"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="scan-eye"><div class="pupil"></div></div><div class="scan-cross"></div></div><span class="art-label">LOOK CLOSER.</span><span class="art-caption">SPATIAL · FREQUENCY · TEMPORAL</span></div></section>
+</div>
+<div class="hero-art" aria-hidden="true">
+  <canvas id="face-mesh" width="480" height="280"></canvas>
+  <div class="mesh-sweep"></div>
+</div></section>
 <div class="workspace-heading" id="analyzer"><div><span class="eyebrow">YOUR ANALYSIS WORKSPACE</span><h2>Start with a video.</h2></div><div class="connection"><span id="health-dot"></span><span id="health">Connecting to analyzer…</span><button class="text-button" id="retry" hidden>Retry</button></div></div>
 <div class="workspace">
 <section class="panel upload-panel" aria-labelledby="upload-title"><div class="panel-heading"><h3 id="upload-title"><span class="step">1</span> Add your video</h3><span class="label">UPLOAD</span></div>
@@ -18,9 +22,18 @@
 <p id="error" class="error" role="alert" hidden></p><button id="analyze" class="button primary" disabled>Analyze video</button><p id="upload-hint" class="small muted">Choose a short clip with a clear, visible face.</p>
 <div class="privacy"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><p>Your video is sent to this analysis server. The temporary upload is deleted after processing; generated reports may remain on the server.</p></div></section>
 <section class="panel result-panel" aria-labelledby="result-title"><div class="panel-heading"><h3 id="result-title"><span class="step">2</span> Understand your result</h3><span id="result-status" class="label">READY WHEN YOU ARE</span></div>
-<div id="empty" class="empty-state"><div class="empty-lens" aria-hidden="true"><span></span></div><h3>A little clarity goes a long way.</h3><p>Upload a video to see the model’s assessment,<br>what it checked, and what to do next.</p><div class="empty-steps"><span>Choose a video</span><b>›</b><span>Run the checks</span><b>›</b><span>Review the result</span></div></div>
+<div id="empty" class="empty-state"><div class="empty-lens" aria-hidden="true"><span></span></div><h3>Your video analysis</h3><p>See overall REAL and FAKE scores, sampled faces and the final prediction here.</p><div class="empty-steps"><span>Choose a video</span><b>›</b><span>Run the checks</span><b>›</b><span>Review the result</span></div></div>
 <div id="loading" class="loading-state" hidden aria-live="polite"><div class="spinner" aria-hidden="true"></div><span class="eyebrow" id="progress-stage">UPLOADING YOUR VIDEO</span><h3 id="progress-title">Getting your video ready</h3><p id="progress-description">Transferring the video to the analysis server.</p><progress id="upload-progress" max="100" value="0" aria-label="Upload progress"></progress><div class="elapsed"><span id="elapsed">0s elapsed</span><span>Please keep this page open</span></div><p class="small muted">We check sampled faces, not every frame. Analysis may take several minutes on a shared free server.</p></div>
-<div id="results" hidden tabindex="-1"><div id="assessment" class="assessment"><div class="assessment-heading"><span id="verdict-symbol" class="verdict-symbol" aria-hidden="true">!</span><div><span class="eyebrow">MODEL ASSESSMENT</span><h3 id="verdict-title"></h3></div></div><p id="verdict-description"></p></div><div class="result-meta"><span id="sample-count"></span><span id="processing-time"></span></div><div class="next-step"><strong>What should you do next?</strong><p id="next-action"></p></div><div class="result-actions"><a id="download" class="button secondary" download>Download report</a><button id="again" class="text-button">Check another video</button></div>
+<div id="results" hidden tabindex="-1"><div id="assessment" class="assessment"><div class="assessment-heading"><span id="verdict-symbol" class="verdict-symbol" aria-hidden="true">!</span><div><span class="eyebrow">MODEL ASSESSMENT</span><h3 id="verdict-title"></h3></div></div><p id="verdict-description"></p></div><section class="overall-scores" aria-labelledby="overall-title">
+  <h3 id="overall-title">Overall video scores</h3>
+  <dl class="score-pair">
+    <div><dt>REAL score</dt><dd id="real-percent"></dd></div>
+    <div><dt>FAKE score</dt><dd id="fake-percent"></dd></div>
+  </dl>
+  <div class="balance-track" aria-hidden="true"><span id="real-share"></span></div>
+  <p id="score-rule"></p>
+  <small>These scores describe the model output. They have not been calibrated as probabilities of authenticity.</small>
+</section><div class="result-meta"><span id="sample-count"></span><span id="processing-time"></span></div><div class="next-step"><strong>What should you do next?</strong><p id="next-action"></p></div><div class="result-actions"><a id="download" class="button secondary" download>Download report</a><button id="again" class="text-button">Check another video</button></div>
 <section class="evidence-review" aria-label="Video evidence">
 <h3>Frame review</h3><p class="small muted">These are the face crops the model checked, in playback order. Open a sample to inspect it at full size.</p>
 <div id="sample-gallery" class="sample-gallery"></div>
