@@ -50,6 +50,8 @@ function node(tag,className,text){const element=document.createElement(tag);if(c
 function safePath(url){return typeof url==='string' && url.startsWith('/assets/web_analyses/') && !url.includes('..') ? url : null;}
 function renderResult(data){
   if(!['REAL','FAKE'].includes(data.label) || !Number.isFinite(data.fake_score))throw new Error('The server returned an incomplete result. Please try again.');
+  $('prediction-label').textContent = data.label;
+  $('prediction').classList.toggle('flagged', data.label === 'FAKE');
   const fake=data.label==='FAKE',report=data.forensic_report||{};
   $('assessment').classList.toggle('suspicious',fake);$('verdict-symbol').textContent=fake?'!':'✓';
   $('verdict-title').textContent=fake?'Possible manipulation detected':'No manipulation detected';
