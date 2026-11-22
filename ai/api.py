@@ -247,6 +247,10 @@ def analyze_video(file: UploadFile = File(...)):
             "sampled_frame_count": result.get("sampled_frame_count"),
             "findings": findings,
             "frame_evidence": overlays,
+            "sample_urls": [
+                f"/assets/web_analyses/{job_id}/{name}" for name in result.get("samples", [])
+            ],
+            "suspicion_timeline": result["suspicion_timeline"],
             "branch_contributions": result["branch_contributions"],
             "attribution_method": result["branch_contributions"].get("method"),
             "evaluation_metrics": evaluation_metrics(),

@@ -54,7 +54,16 @@ def run(video, run_name, output_dir=None):
     fft = torch.stack([transforms.ToTensor()(face_to_fft(f)) for f in selected])
     with torch.inference_mode():
         outputs = model(rgb.unsqueeze(0), fft.unsqueeze(0))
+    samples = []
+    if output_dir is not None:
+        folder = Path(output_dir)
+        folder.mkdir(parents=True, exist_ok=True)
+        for index, face in enumerate(selected):
+            name = f"sample_{index:02d}.jpg"
+            Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB)).save(folder / name)
+            samples.append(name)
     return {
+        'samples': samples,
         'video': str(video), 'run_name': run_name, 'device': 'cpu', 'device_name': 'CPU',
         'face_detector': 'opencv', 'fake_score': float(torch.sigmoid(outputs['logit'])[0]),
         'branch_scores': {k: float(torch.sigmoid(v)[0]) for k,v in outputs['branch_logits'].items()},

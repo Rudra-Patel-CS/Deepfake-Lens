@@ -120,6 +120,11 @@ def run(video, run_name, output_dir=None, face_detector=None):
         outputs = model(rgb.unsqueeze(0).to(DEVICE), fft.unsqueeze(0).to(DEVICE))
     output_dir = Path(output_dir) if output_dir else REPORT_DIR / "explanations" / Path(video).stem
     output_dir.mkdir(parents=True, exist_ok=True)
+    samples = []
+    for index, face in enumerate(faces):
+        name = f"sample_{index:02d}.jpg"
+        face.resize((224, 224)).save(output_dir / name)
+        samples.append(name)
     frame_scores = next(iter(outputs["per_frame_logits"].values()), outputs["logit"].repeat(sequence_length))
     frame_scores = torch.sigmoid(frame_scores[0] if frame_scores.ndim > 1 else frame_scores)
     overlays = generate_gradcam_overlays(
@@ -140,6 +145,7 @@ def run(video, run_name, output_dir=None, face_detector=None):
         "branch_scores": branch_scores,
         "sequence_length": sequence_length,
         "sampled_frame_count": len(faces),
+        "samples": samples,
         "overlays": overlays,
         "branch_contributions": shap_result,
         "suspicion_timeline": suspicion_timeline(outputs["per_frame_logits"]),

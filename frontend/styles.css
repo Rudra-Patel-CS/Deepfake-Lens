@@ -40,3 +40,34 @@
 @keyframes lens-grid {
   to { background-position: 26px 26px; }
 }
+
+body { isolation: isolate; }
+body::before {
+  content: "";
+  position: fixed;
+  inset: -5%;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 12% 22%, #44d9bb40, transparent 44%),
+              radial-gradient(ellipse at 85% 78%, #658aed40, transparent 46%),
+              repeating-linear-gradient(120deg, transparent 0 35px, #356ca30a 36px 37px);
+}
+@media (prefers-reduced-motion: no-preference) {
+  body::before { animation: ambient-drift 18s ease-in-out infinite alternate; }
+}
+@keyframes ambient-drift { to { transform: translate(3%, -3%) scale(1.04); } }
+.evidence-review { margin: 24px 0; border-top: 1px solid #cedae2; }
+.evidence-review h3 { margin: 24px 0 6px; }
+.sample-gallery { display: grid; grid-template-columns: repeat(auto-fit,minmax(90px,1fr)); gap: 10px; }
+.sample-card { display: grid; overflow: hidden; border-radius: 10px; background: #152842; color: white; }
+.sample-card span { padding: 7px; font-size: .78rem; }
+.sample-card img { width: 100%; aspect-ratio: 1; object-fit: cover; }
+.timeline-scroll { overflow-x: auto; }
+.timeline-scroll table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: .85rem; }
+.timeline-scroll th, .timeline-scroll td { text-align: left; padding: 7px; }
+.timeline-scroll tr:nth-child(odd) { background: #e8f3f3; }
+.video-facts { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; }
+.video-facts dd { margin: 0; overflow-wrap: anywhere; }
+.video-facts dt { font-weight: 600; }
+#contributions img { width: 100%; }
+.result-panel { min-width: 0; }

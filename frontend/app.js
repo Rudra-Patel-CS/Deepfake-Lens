@@ -48,6 +48,67 @@ function analysisStage(){
 }
 function node(tag,className,text){const element=document.createElement(tag);if(className)element.className=className;if(text!==undefined)element.textContent=text;return element;}
 function safePath(url){return typeof url==='string' && url.startsWith('/assets/web_analyses/') && !url.includes('..') ? url : null;}
+function renderEvidence(data, report) {
+  const gallery = $('sample-gallery');
+  gallery.replaceChildren();
+  for (const [index, url] of (report.sample_urls || []).entries()) {
+    if (!safePath(url)) continue;
+    const link = node('a', 'sample-card');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    const image = node('img');
+    image.src = url;
+    image.alt = `Face crop from sample ${index + 1}`;
+    image.loading = 'lazy';
+    link.append(image, node('span', '', `Sample ${index + 1}`));
+    gallery.append(link);
+  }
+  if (!gallery.childElementCount) gallery.textContent = 'Face crops were not saved for this run.';
+  const table = node('table');
+  const headings = table.createTHead().insertRow();
+  const rows = table.createTBody();
+  const branches = Object.entries(data.suspicion_timeline || {}).map(
+    ([key, values]) => [key, [values].flat(Infinity)]
+  );
+  headings.append(node('th', '', 'Sample'));
+  const names = {frame: 'Appearance', freq: 'Texture', temporal: 'Consistency'};
+  for (const [key] of branches) headings.append(node('th', '', names[key] || key));
+  const length = Math.max(0, ...branches.map(([, values]) => values.length));
+  for (let index = 0; index < length; index++) {
+    const row = rows.insertRow();
+    row.append(node('th', '', String(index + 1)));
+    for (const [, values] of branches) {
+      const score = values[index];
+      row.insertCell().textContent = Number.isFinite(score) ? percent(score) : 'Unavailable';
+    }
+  }
+  $('timeline').replaceChildren(length ? table : node('p', '', 'Timeline unavailable for this run.'));
+  $('interpretation').textContent = report.interpretation || '';
+  const facts = $('video-facts');
+  facts.replaceChildren();
+  for (const [label, value] of Object.entries({
+    File: data.filename, Clip: $('file-meta').textContent, Model: data.model_run,
+    Detector: data.face_detector, Device: data.device_name,
+    'Predicted class score (uncalibrated)': percent(data.confidence)
+  })) {
+    if (value) facts.append(node('dt', '', label), node('dd', '', value));
+  }
+  $('indicators').replaceChildren(...(report.key_indicators || []).map(
+    item => node('li', '', `${item.label} (${item.status}): ${item.description}`)
+  ));
+  const chart = $('contributions');
+  chart.replaceChildren();
+  if (safePath(data.branch_chart_url)) {
+    const image = node('img');
+    image.src = data.branch_chart_url;
+    image.alt = 'Chart of branch contributions to the combined score';
+    chart.append(node('h4', '', 'Branch contributions'), image);
+    for (const [key, value] of Object.entries(data.branch_contributions || {})) {
+      chart.append(node('p', 'small', `${key}: ${Number.isFinite(value) ? value.toPrecision(4) : value}`));
+    }
+  }
+}
 function renderResult(data){
   if(!['REAL','FAKE'].includes(data.label) || !Number.isFinite(data.fake_score))throw new Error('The server returned an incomplete result. Please try again.');
   $('prediction-label').textContent = data.label;
@@ -57,6 +118,7 @@ function renderResult(data){
   $('verdict-title').textContent=fake?'Possible manipulation detected':'No manipulation detected';
   $('verdict-description').textContent=fake?'The model found patterns that crossed its threshold for possible face manipulation. This is a reason to look closer, not proof that the video is fake.':'The model did not find enough evidence of face manipulation in the samples it checked. This does not prove that the video is authentic.';
   $('next-action').textContent=fake?'Check who originally published the video. Look for an original recording or reliable independent coverage before sharing a claim.':'Consider the source and context too. Audio edits, misleading captions and changes outside the face may not be detected.';
+  renderEvidence(data, report);
   const count=report.sampled_frame_count;
   $('sample-count').textContent=count?`${count} face samples checked`:'Sampled-face analysis';
   $('processing-time').textContent=Number.isFinite(data.processing_seconds)?`${data.processing_seconds.toFixed(1)}s server processing`:'';
@@ -67,8 +129,8 @@ function renderResult(data){
   const definitions=[['frame','Face appearance','Visual patterns in the face.'],['freq','Fine texture','Patterns in the image’s frequency information.'],['temporal','Consistency over time','How sampled face features change through the clip.']];
   for(const [key,title,description] of definitions){const value=data.branch_scores?.[key];if(!Number.isFinite(value))continue;const item=node('div','signal');const head=node('div','signal-head');head.append(node('strong','',title),node('span','',percent(value)));const track=node('div','signal-track'),fill=node('div','signal-fill');fill.style.width=`${Math.max(0,Math.min(1,value))*100}%`;track.append(fill);item.append(head,node('p','',description),track);$('signals').append(item);}
   const frames=(data.detected_frames||[]).filter(frame=>safePath(frame.url));$('frames-section').hidden=!frames.length;$('frames').replaceChildren();
-  for(const frame of frames){const figure=node('figure'),image=node('img');image.src=frame.url;image.alt=`Model sensitivity for sampled face ${frame.frame_index+1}`;image.loading='lazy';figure.append(image,node('figcaption','',`Sample ${frame.frame_index+1}`));$('frames').append(figure);}
-  $('evidence-note').textContent=lightweight?'Explanation images are disabled in standard hosting mode to save memory. The three-branch prediction still runs.':'These signals describe model behavior; they do not identify a proven edit. Face cropping can affect the result.';
+  for(const frame of frames){const figure=node('figure'),image=node('img');image.src=frame.url;image.alt=`Model sensitivity for sampled face ${frame.frame_index+1}`;image.loading='lazy';figure.append(image,node('figcaption','',`Sample ${frame.frame_index+1} · score ${percent(frame.score)}`));$('frames').append(figure);}
+  $('evidence-note').textContent=lightweight?'Standard mode shows sampled faces and scores. Heatmaps and branch attribution require detailed mode. The three-branch prediction still runs.':'These signals describe model behavior; they do not identify a proven edit. Face cropping can affect the result.';
   const url=safePath(data.report_url);$('download').hidden=!url;if(url)$('download').href=url;
   $('results').hidden=false;$('empty').hidden=true;$('result-status').textContent='ANALYSIS COMPLETE';$('results').focus({preventScroll:true});
 }
