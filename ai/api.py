@@ -8,6 +8,7 @@ import json
 import math
 import os
 from threading import Lock
+from time import perf_counter
 from pathlib import Path
 
 import torch
@@ -175,6 +176,7 @@ def analyze_video(file: UploadFile = File(...)):
         file.file.close()
         raise HTTPException(status_code=409, detail="Another video is being analysed. Try again shortly.")
     try:
+        processing_started = perf_counter()
         with upload_path.open("wb") as destination:
             size = 0
             while chunk := file.file.read(1024 * 1024):
@@ -229,6 +231,7 @@ def analyze_video(file: UploadFile = File(...)):
             },
         ]
         report = {
+            "processing_seconds": round(perf_counter() - processing_started, 3),
             "report_type": "deepfake_forensic_analysis",
             "assessment": "FAKE" if is_fake else "REAL",
             "interpretation": interpretation,
@@ -262,6 +265,7 @@ def analyze_video(file: UploadFile = File(...)):
             json.dumps(json_safe(report), indent=2)
         )
         return json_safe({
+            "processing_seconds": report["processing_seconds"],
             "job_id": job_id,
             "model_run": MODEL_RUN,
             "face_detector": result.get("face_detector"),

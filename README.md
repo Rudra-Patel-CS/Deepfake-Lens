@@ -251,3 +251,30 @@ and an out-of-memory restart can still require a larger instance or a smaller
 model. Free services sleep after 15 minutes without traffic. Local Windows tests
 do not reproduce Render's Linux memory cap; verify the deployed logs before
 relying on this service.
+
+## User-friendly analysis interface
+
+The interface now includes a selected-video preview, size/duration checks, actual
+upload progress, elapsed waiting time, plain-language assessments, a downloadable
+report, and expandable technical signals. Analysis itself is indeterminate because
+the API does not publish per-stage progress; the UI does not invent percentages.
+The response includes `processing_seconds`, measured on the server after the
+request reaches the handler (excluding browser upload/network waiting).
+
+### Improving analysis speed
+
+- Use a short clip with a clearly visible face. Smaller files reduce upload time;
+  excessive compression can remove useful detection detail.
+- Keep `RENDER_LIGHTWEIGHT=1` on a small CPU host to avoid the extra explanation
+  passes. This preserves prediction but omits Grad-CAM/SHAP output.
+- Run locally on the RTX 4050 for GPU inference, or use a GPU inference host.
+  Face detection can still run on CPU and remain a bottleneck.
+- Benchmark a paid CPU instance before choosing a plan. Render Free has 0.1 CPU
+  and sleeps after 15 idle minutes; cold-start waiting is separate from inference.
+- Future optimizations include caching the loaded model/detector when RAM allows,
+  decoding only necessary frames, and validating an ONNX/quantized deployment.
+  Cache size must be measured on a 512 MB host, and model conversions or changed
+  frame sampling must be evaluated against the existing model before deployment.
+
+Changing UI or hardware does not itself improve model accuracy. Compare server
+processing time on the same videos before claiming a speed improvement.
